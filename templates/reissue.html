@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>再発行システム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="register-body">
+  <main class="register-main">
+    <section class="register-card">
+      <h1>再発行システム</h1>
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="mobile-success">
+            {% for message in messages %}<div>{{ message }}</div>{% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <div class="register-subpanel">
+        <label>レシート番号</label>
+        <input id="receiptNo" placeholder="例：0001">
+        <button type="button" onclick="loadReissueInfo()">伝票情報を確認</button>
+      </div>
+      <div id="reissueInfo" class="payment-summary-box">未確認</div>
+      <form method="post" action="{{ url_for('reissue_kitchen_ticket') }}" class="register-subpanel">
+        <input type="hidden" name="receipt_no" class="receiptNoHidden">
+        <button type="submit">キッチン伝票を再発行</button>
+      </form>
+      <form method="post" action="{{ url_for('reissue_checkout_receipt') }}" class="register-subpanel">
+        <input type="hidden" name="receipt_no" class="receiptNoHidden">
+        <button type="submit">会計レシートを再発行</button>
+      </form>
+    <footer class="staff-top-footer" style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;">
+      <a class="back-order" href="{{ url_for('staff_portal') }}">スタッフ用TOPページへ戻る</a>
+    </footer>
+
+  </section>
+</main>
+<script>
+function yen(n){return `${Number(n||0).toLocaleString()}円`;}
+async function loadReissueInfo(){
+  const receiptNo=document.getElementById('receiptNo').value.trim();
+  if(!receiptNo){alert('レシート番号を入力してください。');return;}
+  document.querySelectorAll('.receiptNoHidden').forEach(el=>el.value=receiptNo);
+  const res=await fetch(`/api/reissue/${encodeURIComponent(receiptNo)}`);
+  const data=await res.json();
+  const area=document.getElementById('reissueInfo');
+  if(!res.ok||!data.ok){area.textContent=data.message||'取得できません。';return;}
+  const items=data.items.map(item=>`<div class="cart-row"><div>${item.product_name}<div class="small">${yen(item.unit_price)} × ${item.quantity}</div></div><strong>${yen(item.line_total)}</strong></div>`).join('');
+  area.innerHTML=`<div><strong>レシート番号：</strong>${data.receipt_no}</div><div><strong>テーブル：</strong>${data.table_no}</div><div><strong>状態：</strong>${data.status}</div><h3>注文内容</h3>${items||'<p>注文商品なし</p>'}<h3>保存済みファイル</h3><div class="small">キッチン伝票: ${data.files.order_pdfs.length}件</div><div class="small">会計レシート: ${data.files.checkout_pdfs.length}件</div><div class="small">QR付き伝票: ${data.files.entry_pdfs.length}件</div>`;
+}
+</script>
+</body>
+</html>

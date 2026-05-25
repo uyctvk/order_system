@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>入店管理システム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <main>
+    <section class="card">
+      <h1>{{ store_name }}</h1>
+      <button type="button" id="entryReissueButton" onclick="openEntryReissueModal()">再発行</button>
+      <h2>入店管理システム</h2>
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="mobile-success">
+            {% for message in messages %}<div>{{ message }}</div>{% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <p class="legend">
+        <span class="dot paid"></span>決済済み
+        <span class="dot available"></span>使用可
+        <span class="dot occupied"></span>使用中・再会計待ち
+      </p>
+      <div class="table-grid">
+        {% for t in tables %}
+          <button class="table-box {{ t.status }}" data-table-no="{{ t.table_no }}" data-status="{{ t.status }}">
+            {{ t.table_no }}
+          </button>
+        {% endfor %}
+      </div>
+      <footer class="staff-top-footer" style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;">
+        <a class="back-order" href="{{ url_for('staff_portal') }}">スタッフ用TOPページへ戻る</a>
+      </footer>
+
+    </section>
+  </main>
+<script>
+document.querySelectorAll(".table-box").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const tableNo = btn.dataset.tableNo;
+    const status = btn.dataset.status;
+
+    if (status === "available") {
+      if (!confirm(`テーブル${tableNo}を入店処理します。PDF伝票を出力しますか？`)) return;
+    } else if (status === "paid") {
+      if (!confirm(`テーブル${tableNo}を決済済みから使用可に戻しますか？`)) return;
+    } else {
+      alert("このテーブルは使用中です。会計する場合はレジ画面を直接開いてください。");
+      return;
+    }
+
+    const res = await fetch(`/entry/table/${tableNo}`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.message || "処理に失敗しました。");
+      return;
+    }
+    location.reload();
+  });
+});
+</script>
+
+<div class="entry-modal-back" id="entryReissueModal">
+  <div class="entry-modal-card">
+    <h2>再発行</h2>
+    <form method="post" action="{{ url_for('entry_reissue') }}" id="entryReissueForm">
+      <div class="reissue-choice-box">
+        <label class="reissue-choice">
+          <input type="radio" name="reissue_type" value="qr" checked onchange="changeEntryReissueType()">
+          <span>QR再発行</span>
+        </label>
+        <label class="reissue-choice">
+          <input type="radio" name="reissue_type" value="kitchen" onchange="changeEntryReissueType()">
+          <span>キッチン指示伝票</span>
+        </label>
+      </div>
+
+      <div id="qrReissueFields">
+        <label>テーブル番号</label>
+        <input type="number" name="table_no" id="reissueTableNo" placeholder="例：3">
+        <div class="small">または</div>
+        <label>伝票番号</label>
+        <input name="receipt_no_qr" id="reissueReceiptNoQr" placeholder="例：0001">
+      </div>
+
+      <div id="kitchenReissueFields" style="display:none;">
+        <label>伝票番号</label>
+        <input name="receipt_no_kitchen" id="reissueReceiptNoKitchen" placeholder="例：0001">
+      </div>
+
+      <input type="hidden" name="receipt_no" id="entryReissueReceiptNo">
+
+      <button type="submit" class="entry-modal-submit">再発行する</button>
+      <button type="button" class="entry-modal-cancel" onclick="closeEntryReissueModal()">キャンセル</button>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEntryReissueModal() {
+  document.getElementById("entryReissueModal").style.display = "flex";
+  changeEntryReissueType();
+}
+
+function closeEntryReissueModal() {
+  document.getElementById("entryReissueModal").style.display = "none";
+}
+
+function selectedEntryReissueType() {
+  const el = document.querySelector('input[name="reissue_type"]:checked');
+  return el ? el.value : "qr";
+}
+
+function changeEntryReissueType() {
+  const type = selectedEntryReissueType();
+  document.getElementById("qrReissueFields").style.display = type === "qr" ? "block" : "none";
+  document.getElementById("kitchenReissueFields").style.display = type === "kitchen" ? "block" : "none";
+}
+
+document.getElementById("entryReissueForm").addEventListener("submit", (e) => {
+  const type = selectedEntryReissueType();
+
+  if (type === "qr") {
+    const tableNo = document.getElementById("reissueTableNo").value.trim();
+    const receiptNo = document.getElementById("reissueReceiptNoQr").value.trim();
+    if (!tableNo && !receiptNo) {
+      e.preventDefault();
+      alert("QR再発行には、テーブル番号または伝票番号を入力してください。");
+      return;
+    }
+    document.getElementById("entryReissueReceiptNo").value = receiptNo;
+    return;
+  }
+
+  if (type === "kitchen") {
+    const receiptNo = document.getElementById("reissueReceiptNoKitchen").value.trim();
+    if (!receiptNo) {
+      e.preventDefault();
+      alert("キッチン指示伝票の再発行には、伝票番号を入力してください。");
+      return;
+    }
+    document.getElementById("entryReissueReceiptNo").value = receiptNo;
+  }
+});
+</script>
+
+</body>
+</html>

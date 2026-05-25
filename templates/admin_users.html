@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>ユーザー管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .admin-users-wrap { max-width: 1320px; margin: 24px auto; padding: 0 14px; }
+    .user-card { background:#fff; border-radius:18px; padding:22px; box-shadow:0 10px 28px rgba(15,23,42,.08); }
+    .header-row { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .grid-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; align-items:end; }
+    .sub-panel { margin:18px 0; padding:16px; border:1px solid #e5e7eb; border-radius:14px; background:#f9fafb; }
+    .table-wrap { overflow-x:auto; margin-top:16px; }
+    table { width:100%; border-collapse:collapse; min-width:1040px; }
+    th,td { border-bottom:1px solid #e5e7eb; padding:10px; vertical-align:top; text-align:left; }
+    th { background:#f9fafb; white-space:nowrap; }
+    input,select { width:100%; box-sizing:border-box; padding:9px; border:1px solid #d1d5db; border-radius:10px; }
+    button,.link-button { display:inline-block; border:0; border-radius:10px; padding:9px 12px; background:#111827; color:#fff; text-decoration:none; font-weight:700; cursor:pointer; }
+    button:disabled, select:disabled { opacity:.55; cursor:not-allowed; }
+    .sub { background:#6b7280; }
+    .ok { color:#065f46; font-weight:700; }
+    .ng { color:#991b1b; font-weight:700; }
+    .small { color:#6b7280; font-size:13px; }
+    .self-note { color:#9a3412; font-size:12px; margin-top:4px; line-height:1.5; }
+    .user-forms { display:none; }
+    .staff-top-footer { margin-top:30px; padding-top:18px; border-top:1px solid #e5e7eb; text-align:center; }
+  </style>
+</head>
+<body>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="flash">{% for message in messages %}<div>{{ message }}</div>{% endfor %}</div>
+  {% endif %}
+{% endwith %}
+
+<main class="admin-users-wrap">
+  <section class="user-card">
+    <div class="header-row">
+      <div>
+        <h1>ユーザー管理</h1>
+        <p class="small">管理者専用。登録済みユーザーを一覧で確認し、ID・表示名・権限・状態・パスワードを更新できます。</p>
+      </div>
+      <form method="post" action="{{ url_for('staff_logout') }}"><button type="submit" class="sub">ログアウト</button></form>
+    </div>
+
+    <section class="sub-panel">
+      <h2>新規ユーザー登録</h2>
+      <form method="post" action="{{ url_for('admin_users_create') }}" class="grid-form">
+        <label>ID<input name="username" required placeholder="例：staff01"></label>
+        <label>表示名<input name="display_name" placeholder="例：田中"></label>
+        <label>初期パスワード<input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
+        <label>権限
+          <select name="role">
+            <option value="staff">店員</option>
+            <option value="admin">管理者</option>
+          </select>
+        </label>
+        <button type="submit">登録する</button>
+      </form>
+    </section>
+
+    <section class="sub-panel">
+      <h2>ユーザー一覧</h2>
+      <p class="small">各行の入力欄・プルダウンを変更して「更新」を押すと、そのユーザー情報が staff_users.txt に反映されます。</p>
+
+      <div class="user-forms">
+        {% for u in users %}
+          <form id="userForm{{ u.id }}" method="post" action="{{ url_for('admin_users_update', user_id=u.id) }}"></form>
+        {% endfor %}
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>内部ID</th>
+              <th>ログインID</th>
+              <th>表示名</th>
+              <th>権限</th>
+              <th>状態</th>
+              <th>新パスワード</th>
+              <th>作成日</th>
+              <th>更新</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for u in users %}
+            <tr>
+              <td>{{ u.id }}</td>
+              <td><input form="userForm{{ u.id }}" name="username" value="{{ u.username }}" required></td>
+              <td><input form="userForm{{ u.id }}" name="display_name" value="{{ u.display_name or '' }}"></td>
+              <td>
+                <select form="userForm{{ u.id }}" name="role" {% if current_user.id == u.id %}disabled{% endif %}>
+                  <option value="staff" {% if u.role == 'staff' %}selected{% endif %}>店員</option>
+                  <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>管理者</option>
+                </select>
+                {% if current_user.id == u.id %}
+                  <input form="userForm{{ u.id }}" type="hidden" name="role" value="{{ u.role }}">
+                  <div class="self-note">自分自身の権限は変更できません。</div>
+                {% endif %}
+              </td>
+              <td>
+                <select form="userForm{{ u.id }}" name="is_active" {% if current_user.id == u.id %}disabled{% endif %}>
+                  <option value="1" {% if u.is_active %}selected{% endif %}>有効</option>
+                  <option value="0" {% if not u.is_active %}selected{% endif %}>退会</option>
+                </select>
+                {% if current_user.id == u.id %}
+                  <input form="userForm{{ u.id }}" type="hidden" name="is_active" value="{{ u.is_active }}">
+                  <div class="self-note">自分自身は退会にできません。</div>
+                {% endif %}
+              </td>
+              <td><input form="userForm{{ u.id }}" type="password" name="password" minlength="8" autocomplete="new-password" placeholder="変更時のみ入力"></td>
+              <td><span class="small">{{ u.created_at }}</span></td>
+              <td><button form="userForm{{ u.id }}" type="submit">更新</button></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8" class="small">登録済みユーザーがありません。</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="sub-panel">
+      <h2>最近のユーザー操作ログ</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>日時</th><th>操作</th><th>操作ユーザー</th><th>対象</th><th>詳細</th></tr></thead>
+          <tbody>
+          {% for log in logs %}
+            <tr>
+              <td>{{ log.created_at }}</td>
+              <td>{{ log.action }}</td>
+              <td>{{ log.actor_username or '-' }}</td>
+              <td>{{ log.target_type }} / {{ log.target_id }}</td>
+              <td>{{ log.detail or '-' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="small">まだログはありません。</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="staff-top-footer">
+      <a class="back-order" href="{{ url_for('staff_portal') }}">スタッフ用TOPページへ戻る</a>
+    </footer>
+  </section>
+</main>
+</body>
+</html>

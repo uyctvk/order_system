@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>レジシステム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="flash">
+      {% for message in messages %}<div>{{ message }}</div>{% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<main>
+  <section class="card register-card">
+    <h1>レジ</h1>
+    <a id="registerOtherButton" href="{{ url_for('register_other') }}">その他</a>
+    <form method="post" action="{{ url_for('pay') }}" id="payForm">
+      <div class="modal-panel" id="frontPanel">
+        <h2>レジ認証</h2>
+        <p>レシート番号と責任者番号を入力してください。</p>
+        <label>レシート番号</label>
+        <input name="receipt_no" id="receiptNo" list="receiptList" required placeholder="例：20260509120000-T01">
+        <datalist id="receiptList">
+          {% for r in receipts %}
+            <option value="{{ r.receipt_no }}">テーブル{{ r.table_no }} / 小計{{ r.live_subtotal }}円</option>
+          {% endfor %}
+        </datalist>
+        <label>責任者番号</label>
+        <input name="manager_no" id="managerNo" required placeholder="例：001">
+        <button type="button" onclick="closeFrontPanel()">会計画面へ</button>
+      </div>
+
+      <div class="register-layout">
+        <section>
+          <h2>会計種別</h2>
+          <div class="button-grid two">
+            <label><input type="radio" name="checkout_type" value="通常会計" onchange="onCheckoutTypeChange()" checked> 通常会計</label>
+            <label><input type="radio" name="checkout_type" value="個別会計" onchange="onCheckoutTypeChange()"> 個別会計</label>
+            <label><input type="radio" name="checkout_type" value="合算会計" onchange="onCheckoutTypeChange()"> 合算会計</label>
+          </div>
+
+          <div class="register-subpanel" id="partialPanel" style="display:none;">
+            <button type="button" id="partialSelectButton" onclick="openPartialModal()">個別会計の商品を選択</button>
+            <div class="small" id="partialSummary">未選択</div>
+          </div>
+
+          <div class="register-subpanel" id="combinedPanel" style="display:none;">
+            <label>追加するレシート番号</label>
+            <textarea id="combinedInput" placeholder="例：0002 または 0002,0003"></textarea>
+            <button type="button" onclick="applyCombinedReceipts()">追加して合算小計を取得</button>
+            <div class="small">ここには追加分だけ入力してください。例：基準が0001なら、ここは0002だけ。</div>
+          </div>
+
+          <h2>金額</h2>
+          <div class="amount-board">
+            <div class="amount-row"><span>小計</span><strong id="subtotalText">0円</strong></div>
+            <div class="amount-row"><span>クーポン</span><strong class="discount-red" id="couponText">-0円</strong></div>
+            <div class="amount-row"><span>割引</span><strong class="discount-red" id="discountText">-0円</strong></div>
+            <div class="amount-row total"><span>合計</span><strong id="totalText">0円</strong></div>
+          </div>
+          <input type="hidden" name="coupon_amount" id="couponAmount" value="0">
+          <input type="hidden" name="discount_rate" id="discountRate" value="0">
+          <input type="hidden" name="selected_items" id="selectedItems" value="">
+          <input type="hidden" name="combined_receipts" id="combinedReceipts" value="">
+          <input type="hidden" name="payment_breakdown" id="paymentBreakdown" value="">
+
+          <div class="utility-buttons">
+            <button type="button" onclick="openCouponPopup()">クーポン使用</button>
+            <button type="button" onclick="openDiscountPopup()">割引</button>
+          </div>
+        </section>
+
+        <section>
+          <h2>支払方法</h2>
+          <input type="hidden" name="payment_method" id="paymentMethod" value="">
+          <div class="payment-grid payment-buttons">
+            <button type="button" onclick="openPaymentPopup('現金')">現金</button>
+            <button type="button" onclick="openPaymentPopup('電子マネー')">電子マネー</button>
+            <button type="button" onclick="openPaymentPopup('クレジット')">クレジット</button>
+            <button type="button" onclick="openPaymentPopup('QRコード')">QRコード</button>
+            <button type="button" onclick="openPaymentPopup('WAON')">WAON</button>
+            <button type="button" onclick="openPaymentPopup('WAONポイント')">WAONポイント払い</button>
+          </div>
+
+          <div class="payment-summary-box">
+            <div class="small">支払内訳</div>
+            <div id="paymentSummary">未入力</div>
+            <div class="small">支払合計：<span id="paymentPaidTotal">0円</span> / 不足：<span id="paymentRemain">0円</span></div>
+            <button type="button" id="paymentResetButton" onclick="resetPayments()">支払内訳をリセット</button>
+          </div>
+          <button class="pay-btn" type="submit">会計確定</button>
+        </section>
+      </div>
+    </form>
+  </section>
+</main>
+
+<div class="popup-back" id="paymentPopup">
+  <div class="popup-card">
+    <h2 id="paymentPopupTitle">支払金額</h2>
+    <p class="small">この支払方法で追加する金額を入力してください。</p>
+    <input type="text" id="paymentAmountInput" inputmode="numeric" autocomplete="off" value="0" placeholder="例：100000 / 100,000">
+    <div class="small">金額上限は設けていません。カンマ付き入力も可能です。</div>
+    <button type="button" onclick="applyPaymentAmount()">適用</button>
+    <button type="button" class="sub" onclick="closePopup('paymentPopup')">キャンセル</button>
+  </div>
+</div>
+
+<div class="popup-back" id="partialModal">
+  <div class="popup-card wide-popup">
+    <h2>個別会計 商品選択</h2>
+    <p class="small">会計する商品の種類と個数を選択してください。未選択分は伝票に残ります。</p>
+    <div id="partialItemsArea"></div>
+    <button onclick="applyPartialSelection()">選択内容を小計に反映</button>
+    <button class="sub" onclick="closePartialModal()">キャンセル</button>
+  </div>
+</div>
+
+<div class="popup-back" id="couponPopup">
+  <div class="popup-card">
+    <h2>クーポン使用金額</h2>
+    <input type="text" id="couponInput" inputmode="numeric" autocomplete="off" value="0" placeholder="例：500 / 1,000">
+    <div class="small">クーポン金額に上限は設けていません。カンマ付き入力も可能です。</div>
+    <button onclick="applyCoupon()">適用</button>
+    <button class="sub" onclick="closePopup('couponPopup')">キャンセル</button>
+  </div>
+</div>
+
+<div class="popup-back" id="discountPopup">
+  <div class="popup-card">
+    <h2>割引率</h2>
+    <div class="discount-options">
+      <button onclick="applyDiscount(20)">20%</button>
+      <button onclick="applyDiscount(10)">10%</button>
+      <button onclick="applyDiscount(5)">5%</button>
+      <button class="sub" onclick="applyDiscount(0)">割引なし</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let subtotal = 0;
+let couponAmount = 0;
+let discountRate = 0;
+let paymentBreakdown = [];
+let currentPaymentMethod = "";
+
+function yen(n) { return `${Math.max(0, Math.round(n)).toLocaleString()}円`; }
+
+function normalizeNumericText(value) {
+  const zenkaku = "０１２３４５６７８９，．＋－";
+  const hankaku = "0123456789,.+-";
+  let s = String(value || "").trim();
+  s = s.replace(/[０-９，．＋－]/g, ch => hankaku[zenkaku.indexOf(ch)] || ch);
+  return s.replace(/[,円￥¥\s]/g, "").replace(/^\+/, "");
+}
+
+function parseYenInput(value) {
+  const s = normalizeNumericText(value);
+  if (!/^\d+$/.test(s)) return 0;
+  return Number(s);
+}
+
+function selectedCheckoutType() {
+  const el = document.querySelector('input[name="checkout_type"]:checked');
+  return el ? el.value : "通常会計";
+}
+
+function updateAmounts() {
+  const discountAmount = Math.floor(subtotal * discountRate / 100);
+  const total = Math.max(0, subtotal - couponAmount - discountAmount);
+  document.getElementById("subtotalText").textContent = yen(subtotal);
+  document.getElementById("couponText").textContent = `-${yen(couponAmount)}`;
+  document.getElementById("discountText").textContent = discountRate > 0 ? `-${discountRate}% / ${yen(discountAmount)}` : "-0円";
+  document.getElementById("totalText").textContent = yen(total);
+  document.getElementById("couponAmount").value = couponAmount;
+  document.getElementById("discountRate").value = discountRate;
+  updatePaymentSummary();
+}
+
+
+function getCurrentTotal() {
+  const discountAmount = Math.floor(subtotal * discountRate / 100);
+  return Math.max(0, subtotal - couponAmount - discountAmount);
+}
+
+function openPaymentPopup(method) {
+  currentPaymentMethod = method;
+  document.getElementById("paymentPopupTitle").textContent = `${method} 追加金額`;
+
+  const currentTotal = getCurrentTotal();
+  const paid = paymentBreakdown.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const remain = Math.max(0, currentTotal - paid);
+
+  // 同じ支払方法をもう一度押した場合も、既存額を上書きせず「不足分を追加」しやすくする。
+  document.getElementById("paymentAmountInput").value = remain;
+  document.getElementById("paymentPopup").style.display = "flex";
+}
+
+function applyPaymentAmount() {
+  const addAmount = parseYenInput(document.getElementById("paymentAmountInput").value);
+
+  if (addAmount > 0) {
+    const existing = paymentBreakdown.find(p => p.method === currentPaymentMethod);
+    if (existing) {
+      existing.amount = Number(existing.amount || 0) + addAmount;
+    } else {
+      paymentBreakdown.push({ method: currentPaymentMethod, amount: addAmount });
+    }
+  }
+
+  closePopup("paymentPopup");
+  updatePaymentSummary();
+}
+
+
+function updatePaymentSummary() {
+  const total = getCurrentTotal();
+  const paid = paymentBreakdown.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const remain = Math.max(0, total - paid);
+  const over = Math.max(0, paid - total);
+
+  document.getElementById("paymentBreakdown").value = JSON.stringify(paymentBreakdown);
+  document.getElementById("paymentMethod").value = paymentBreakdown.map(p => `${p.method}:${p.amount}円`).join(" + ");
+
+  const summary = document.getElementById("paymentSummary");
+  if (!paymentBreakdown.length) {
+    summary.textContent = "未入力";
+  } else {
+    summary.innerHTML = paymentBreakdown
+      .map(p => `<div>${p.method}：${yen(p.amount)}</div>`)
+      .join("");
+  }
+
+  document.getElementById("paymentPaidTotal").textContent = yen(paid);
+  document.getElementById("paymentRemain").textContent = over > 0 ? `超過 ${yen(over)}` : yen(remain);
+}
+
+function resetPayments() {
+  paymentBreakdown = [];
+  currentPaymentMethod = "";
+  updatePaymentSummary();
+}
+
+async function loadAmount() {
+  const receiptNo = document.getElementById("receiptNo").value.trim();
+  if (!receiptNo) return false;
+  const res = await fetch(`/api/receipt/${encodeURIComponent(receiptNo)}/amount`);
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    alert(data.message || "有効なレシート番号が見つかりません。");
+    return false;
+  }
+  subtotal = Number(data.subtotal || 0);
+  couponAmount = 0;
+  discountRate = 0;
+  resetPayments();
+  updateAmounts();
+  return true;
+}
+
+async function closeFrontPanel() {
+  const receiptNo = document.getElementById("receiptNo").value.trim();
+  const managerNo = document.getElementById("managerNo").value.trim();
+  if (!receiptNo || !managerNo) {
+    alert("レシート番号と責任者番号を入力してください。");
+    return;
+  }
+  const ok = await loadAmount();
+  if (!ok) return;
+  document.getElementById("frontPanel").style.display = "none";
+  onCheckoutTypeChange();
+}
+
+function onCheckoutTypeChange() {
+  const type = selectedCheckoutType();
+  document.getElementById("partialPanel").style.display = type === "個別会計" ? "block" : "none";
+  document.getElementById("combinedPanel").style.display = type === "合算会計" ? "block" : "none";
+
+  document.getElementById("selectedItems").value = "";
+  document.getElementById("combinedReceipts").value = "";
+
+  if (type === "通常会計") {
+    loadAmount();
+  } else {
+    subtotal = 0;
+    couponAmount = 0;
+    discountRate = 0;
+    updateAmounts();
+  }
+}
+
+async function openPartialModal() {
+  const receiptNo = document.getElementById("receiptNo").value.trim();
+  if (!receiptNo) {
+    alert("レシート番号を入力してください。");
+    return;
+  }
+
+  const res = await fetch(`/api/receipt/${encodeURIComponent(receiptNo)}/unpaid-items`);
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    alert(data.message || "商品一覧を取得できません。");
+    return;
+  }
+
+  const area = document.getElementById("partialItemsArea");
+  area.innerHTML = "";
+
+  if (!data.items.length) {
+    area.innerHTML = "<p>未会計の商品がありません。</p>";
+  }
+
+  data.items.forEach(item => {
+    const row = document.createElement("div");
+    row.className = "partial-row";
+    row.innerHTML = `
+      <div class="partial-name">
+        <strong>${item.product_name}</strong>
+        <div class="small">${yen(item.unit_price)} / 未会計 ${item.remain_quantity}個</div>
+      </div>
+      <input class="partial-qty" type="number" min="0" max="${item.remain_quantity}" value="0" data-id="${item.id}">
+    `;
+    area.appendChild(row);
+  });
+
+  document.getElementById("partialModal").style.display = "flex";
+}
+
+function closePartialModal() {
+  document.getElementById("partialModal").style.display = "none";
+}
+
+async function applyPartialSelection() {
+  const receiptNo = document.getElementById("receiptNo").value.trim();
+  const items = [];
+
+  document.querySelectorAll(".partial-qty").forEach(input => {
+    const qty = Number(input.value || 0);
+    if (qty > 0) {
+      items.push({ id: Number(input.dataset.id), quantity: qty });
+    }
+  });
+
+  if (!items.length) {
+    alert("会計する商品を1つ以上選択してください。");
+    return;
+  }
+
+  const res = await fetch("/api/register/partial-preview", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ receipt_no: receiptNo, items })
+  });
+  const data = await res.json();
+
+  if (!res.ok || !data.ok) {
+    alert(data.message || "個別会計小計を計算できません。");
+    return;
+  }
+
+  document.getElementById("selectedItems").value = JSON.stringify(data.items);
+  subtotal = Number(data.subtotal || 0);
+  document.getElementById("partialSummary").textContent = `${data.items.length}種類 / ${yen(subtotal)}`;
+  resetPayments();
+  closePartialModal();
+  updateAmounts();
+}
+
+async function applyCombinedReceipts() {
+  const baseReceiptNo = document.getElementById("receiptNo").value.trim();
+  const raw = document.getElementById("combinedInput").value.trim();
+
+  if (!baseReceiptNo) {
+    alert("先に基準となるレシート番号を入力してください。");
+    return;
+  }
+
+  const additionalReceiptNos = raw
+    .split(/[,\n\s]+/)
+    .map(x => x.trim())
+    .filter(Boolean);
+
+  const uniqueAdditional = Array.from(new Set(additionalReceiptNos))
+    .filter(x => x !== baseReceiptNo);
+
+  if (uniqueAdditional.length < 1) {
+    alert("追加するレシート番号を1件以上入力してください。例：0002");
+    return;
+  }
+
+  // 追加欄には追加分だけ入力すればよい。
+  // 内部処理では、基準伝票 + 追加伝票に自動補完する。
+  const receiptNosForPreview = [baseReceiptNo, ...uniqueAdditional];
+
+  const res = await fetch("/api/register/combined-preview", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ receipt_nos: receiptNosForPreview })
+  });
+  const data = await res.json();
+
+  if (!res.ok || !data.ok) {
+    alert(data.message || "合算小計を取得できません。");
+    return;
+  }
+
+  const validReceipts = data.receipts.map(r => r.receipt_no);
+  if (!validReceipts.includes(baseReceiptNo)) {
+    alert("基準伝票の未会計データが見つかりません。");
+    return;
+  }
+
+  const validAdditional = validReceipts.filter(rn => rn !== baseReceiptNo);
+  if (validAdditional.length < 1) {
+    alert("追加伝票の未会計データが見つかりません。");
+    return;
+  }
+
+  // backend側でも基準伝票を補完できるが、
+  // フロント側でも明示的に「基準 + 追加」をhiddenへ入れておく。
+  document.getElementById("combinedReceipts").value = [baseReceiptNo, ...validAdditional].join(",");
+  document.getElementById("receiptNo").value = baseReceiptNo;
+  subtotal = Number(data.subtotal || 0);
+  resetPayments();
+  updateAmounts();
+}
+
+function ensureCombinedReceiptsBeforeSubmit() {
+  const type = selectedCheckoutType();
+  if (type !== "合算会計") return true;
+
+  const baseReceiptNo = document.getElementById("receiptNo").value.trim();
+  const raw = document.getElementById("combinedInput").value.trim();
+
+  if (!baseReceiptNo) {
+    alert("基準となるレシート番号を入力してください。");
+    return false;
+  }
+
+  const additionalReceiptNos = raw
+    .split(/[,\n\s]+/)
+    .map(x => x.trim())
+    .filter(Boolean);
+
+  const uniqueAdditional = Array.from(new Set(additionalReceiptNos))
+    .filter(x => x !== baseReceiptNo);
+
+  if (uniqueAdditional.length < 1) {
+    alert("追加するレシート番号を1件以上入力してください。例：0002");
+    return false;
+  }
+
+  // 「合算小計を取得」ボタンを押し忘れても、会計確定時に基準+追加で送る。
+  document.getElementById("combinedReceipts").value = [baseReceiptNo, ...uniqueAdditional].join(",");
+  return true;
+}
+
+
+document.getElementById("receiptNo").addEventListener("change", () => {
+  if (selectedCheckoutType() === "通常会計") loadAmount();
+});
+
+function openCouponPopup() { document.getElementById("couponPopup").style.display = "flex"; }
+function openDiscountPopup() { document.getElementById("discountPopup").style.display = "flex"; }
+function closePopup(id) { document.getElementById(id).style.display = "none"; }
+
+function applyCoupon() {
+  couponAmount = parseYenInput(document.getElementById("couponInput").value);
+  closePopup("couponPopup");
+  updateAmounts();
+}
+
+function applyDiscount(rate) {
+  discountRate = rate;
+  closePopup("discountPopup");
+  updateAmounts();
+}
+
+let paySubmitting = false;
+function disablePaySubmit() {
+  const btn = document.querySelector('#payForm button[type="submit"]');
+  if (btn) {
+    btn.disabled = true;
+    if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+    btn.textContent = "会計処理中...";
+  }
+}
+
+document.getElementById("payForm").addEventListener("submit", (e) => {
+  if (paySubmitting) {
+    e.preventDefault();
+    return;
+  }
+  const type = selectedCheckoutType();
+
+  if (type === "個別会計" && !document.getElementById("selectedItems").value) {
+    e.preventDefault();
+    alert("個別会計の商品を選択してください。");
+    return;
+  }
+
+  if (type === "合算会計" && !ensureCombinedReceiptsBeforeSubmit()) {
+    e.preventDefault();
+    return;
+  }
+
+  const total = getCurrentTotal();
+  const paid = paymentBreakdown.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  if (!paymentBreakdown.length) {
+    e.preventDefault();
+    alert("支払方法ボタンを押して、使用金額を入力してください。");
+    return;
+  }
+  if (paid !== total) {
+    e.preventDefault();
+    alert(`支払金額の合計が会計金額と一致しません。支払合計:${yen(paid)} / 会計金額:${yen(total)}`);
+    return;
+  }
+
+  paySubmitting = true;
+  disablePaySubmit();
+});
+
+updateAmounts();
+</script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>ご利用人数入力</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="mobile-body">
+  <main class="mobile-main">
+    <section class="mobile-card">
+      <h1>{{ store_name }}</h1>
+      <p class="mobile-sub">テーブル{{ receipt.table_no }} / レシート番号 {{ receipt.receipt_no }}</p>
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="mobile-success">
+            {% for message in messages %}
+              <div>{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <h2 class="category-title">ご利用人数</h2>
+      <p class="small">一度登録すると通常の商品注文画面へ進みます。</p>
+
+      <form method="post" class="guest-info-form">
+        <input type="hidden" name="form_type" value="guest_info">
+
+        <label>大人</label>
+        <div class="guest-counter">
+          <button type="button" onclick="changeCount('adult_count', -1)">−</button>
+          <input type="number" name="adult_count" id="adult_count" value="1" min="0">
+          <button type="button" onclick="changeCount('adult_count', 1)">＋</button>
+          <span>名</span>
+        </div>
+
+        <label>子供</label>
+        <div class="guest-counter">
+          <button type="button" onclick="changeCount('child_count', -1)">−</button>
+          <input type="number" name="child_count" id="child_count" value="0" min="0">
+          <button type="button" onclick="changeCount('child_count', 1)">＋</button>
+          <span>名</span>
+        </div>
+
+        <h3>子供用備品</h3>
+
+        <label>子供用箸</label>
+        <div class="guest-counter">
+          <button type="button" onclick="changeCount('child_chopsticks', -1)">−</button>
+          <input type="number" name="child_chopsticks" id="child_chopsticks" value="0" min="0">
+          <button type="button" onclick="changeCount('child_chopsticks', 1)">＋</button>
+          <span>個</span>
+        </div>
+
+        <label>子供用スプーン・フォーク</label>
+        <div class="guest-counter">
+          <button type="button" onclick="changeCount('spoon_fork', -1)">−</button>
+          <input type="number" name="spoon_fork" id="spoon_fork" value="0" min="0">
+          <button type="button" onclick="changeCount('spoon_fork', 1)">＋</button>
+          <span>個</span>
+        </div>
+
+        <button class="submit-order" type="submit">登録して注文へ進む</button>
+      </form>
+    </section>
+  </main>
+
+<script>
+function changeCount(id, diff) {
+  const input = document.getElementById(id);
+  const current = Number(input.value || 0);
+  input.value = Math.max(0, current + diff);
+}
+</script>
+</body>
+</html>

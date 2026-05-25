@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>レジその他</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}<div class="flash">{% for message in messages %}<div>{{ message }}</div>{% endfor %}</div>{% endif %}
+{% endwith %}
+<main>
+  <section class="card register-card wide-admin">
+    <h1>レジその他</h1>
+    <form method="get" action="{{ url_for('register_other') }}" class="register-subpanel other-filter">
+      <label>開始日</label><input type="date" name="date_from" value="{{ date_from }}">
+      <label>終了日</label><input type="date" name="date_to" value="{{ date_to }}">
+      <button type="submit">表示更新</button>
+    </form>
+
+    <section class="other-grid">
+      <div class="payment-summary-box"><div class="small">売上件数</div><strong>{{ summary.count }}件</strong></div>
+      <div class="payment-summary-box"><div class="small">売上金額</div><strong>{{ "{:,}".format(summary.total) }}円</strong></div>
+      <div class="payment-summary-box"><div class="small">返金件数</div><strong>{{ summary.refund_count }}件</strong></div>
+      <div class="payment-summary-box"><div class="small">返金金額</div><strong>{{ "{:,}".format(summary.refund_total) }}円</strong></div>
+      <div class="payment-summary-box"><div class="small">営業開始時現金</div><strong>{{ "{:,}".format(summary.opening_cash) }}円</strong></div>
+      <div class="payment-summary-box"><div class="small">現金売上</div><strong>{{ "{:,}".format(summary.cash_payment) }}円</strong></div>
+      <div class="payment-summary-box cash-balance-box">
+        <div class="small">レジ内現金残高</div>
+        <strong id="expectedCashBalance" data-amount="{{ summary.cash_balance }}">{{ "{:,}".format(summary.cash_balance) }}円</strong>
+        <button type="button" class="mini-action-btn" onclick="openCashCheckModal()">残高チェック</button>
+      </div>
+    </section>
+
+    <h2>営業開始時現金</h2>
+    <form method="post" action="{{ url_for('register_opening_cash') }}" class="register-subpanel" id="openingCashForm">
+      <label>対象日</label><input type="date" name="date_key" value="{{ close_date }}" required>
+      <label>営業開始時現金</label><input type="text" name="opening_cash" inputmode="numeric" autocomplete="off" placeholder="例：100000 / 100,000" value="{{ '{:,}'.format(opening_cash.opening_cash) }}" required>
+      <div class="small">釣銭準備金など、営業開始時点でレジに入っている現金を登録します。金額上限はありません。</div>
+      <label>担当者番号</label><input name="manager_no" value="{{ opening_cash.manager_no }}" placeholder="例：001" required>
+      <label>メモ</label><input name="note" value="{{ opening_cash.note }}" placeholder="任意">
+      <button type="submit">営業開始時現金を登録</button>
+    </form>
+
+    <h2>支払方法別チェック</h2>
+    <table class="summary-table">
+      <tr><th>支払方法</th><th>回数</th><th>金額</th></tr>
+      {% for p in summary.payments %}
+        <tr>
+          <td>{{ p.payment_method }}</td>
+          <td>{{ p.count }}</td>
+          <td>{{ "{:,}".format(p.amount) }}円</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="small">該当期間の支払データはありません。</td></tr>
+      {% endfor %}
+    </table>
+
+    <h2>クーポン・割引確認</h2>
+    <table class="summary-table">
+      <tr><th>項目</th><th>回数</th><th>金額</th></tr>
+      <tr>
+        <td>クーポン</td>
+        <td>{{ summary.coupon_count }}</td>
+        <td>{{ "{:,}".format(summary.coupon_amount) }}円</td>
+      </tr>
+      {% for d in summary.discounts %}
+        <tr>
+          <td>割引 {{ d.rate }}%</td>
+          <td>{{ d.count }}</td>
+          <td>{{ "{:,}".format(d.amount) }}円</td>
+        </tr>
+      {% endfor %}
+    </table>
+
+    <h2>日次締め</h2>
+    <form method="post" action="{{ url_for('register_daily_close') }}" class="register-subpanel" id="dailyCloseForm">
+      <label>対象日</label><input type="date" name="date_key" value="{{ close_date }}" required>
+      <div class="payment-summary-box">
+        <div class="small">システム上の現金残高</div>
+        <strong>{{ "{:,}".format(summary.cash_balance) }}円</strong>
+      </div>
+      <label>実際の現金残高</label><input type="text" name="actual_cash" id="dailyCloseActualCash" inputmode="numeric" autocomplete="off" placeholder="未入力時はシステム上の残高を使用 / 例：100,000">
+      <button type="button" class="mini-action-btn" onclick="copyCashCheckToDailyClose()">金種チェック結果を反映</button>
+      <label>担当者番号</label><input name="manager_no" placeholder="例：001" required>
+      <label>メモ</label><input name="note" placeholder="任意">
+      <button type="submit">日次締めPDFを作成</button>
+      {% if daily_closing %}
+        <div class="small" style="margin-top:8px;">
+          最終締め：{{ daily_closing.closed_at }} / 実際の現金 {{ "{:,}".format(daily_closing.actual_cash) }}円 / 差額 {{ "{:+,}".format(daily_closing.difference_cash) }}円
+          <br><a class="back-order" href="{{ url_for('daily_close_pdf', date_key=close_date) }}" target="_blank">作成済み日次締めPDFを開く</a>
+        </div>
+      {% endif %}
+    </form>
+
+    <h2>誤会計返金</h2>
+    <form method="post" action="{{ url_for('register_refund') }}" class="register-subpanel" id="refundForm">
+      <label>伝票番号</label><input name="receipt_no" placeholder="例：0001" required>
+      <label>責任者番号</label><input name="manager_no" placeholder="例：001" required>
+      <label>理由</label><input name="reason" placeholder="例：誤会計のため">
+      <button type="submit">返金処理</button>
+    </form>
+
+    <h2>レジ金処理</h2>
+    <form method="post" action="{{ url_for('cash_drawer_action') }}" class="register-subpanel" id="cashDrawerForm">
+      <label>区分</label>
+      <select name="action_type"><option value="入金">レジ金入金</option><option value="回収">レジ金回収（出金）</option></select>
+      <label>金額</label><input class="cash-free-amount" type="text" name="amount" inputmode="numeric" autocomplete="off" placeholder="例：100000 / 100,000" required>
+      <div class="small">金額上限は設けていません。カンマ付き入力も可能です。</div>
+      <label>責任者番号</label><input name="manager_no" required>
+      <label>メモ</label><input name="note" placeholder="任意">
+      <button type="submit">記録する</button>
+    </form>
+
+    <footer class="staff-top-footer" style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;">
+      <a class="back-order" href="{{ url_for('staff_portal') }}">スタッフ用TOPページへ戻る</a>
+    </footer>
+
+  </section>
+</main>
+
+<div class="cash-check-back" id="cashCheckModal">
+  <div class="cash-check-card">
+    <h2>レジ内現金残高チェック</h2>
+    <p class="small">各金種の枚数を入力してください。入力中のデータはこの端末に自動保存されます。</p>
+
+    <div class="cash-check-summary">
+      <div>システム上の残高：<strong id="cashExpectedText">0円</strong></div>
+      <div>実際の金額：<strong id="cashActualText">0円</strong></div>
+      <div>差額：<strong id="cashDiffText">0円</strong></div>
+    </div>
+
+    <div class="cash-denom-grid" id="cashDenomGrid">
+      <label>10000円 <input type="text" inputmode="numeric" autocomplete="off" data-denom="10000" placeholder="0"></label>
+      <label>5000円 <input type="text" inputmode="numeric" autocomplete="off" data-denom="5000" placeholder="0"></label>
+      <label>1000円 <input type="text" inputmode="numeric" autocomplete="off" data-denom="1000" placeholder="0"></label>
+      <label>500円 <input type="text" inputmode="numeric" autocomplete="off" data-denom="500" placeholder="0"></label>
+      <label>100円 <input type="text" inputmode="numeric" autocomplete="off" data-denom="100" placeholder="0"></label>
+      <label>50円 <input type="text" inputmode="numeric" autocomplete="off" data-denom="50" placeholder="0"></label>
+      <label>10円 <input type="text" inputmode="numeric" autocomplete="off" data-denom="10" placeholder="0"></label>
+      <label>5円 <input type="text" inputmode="numeric" autocomplete="off" data-denom="5" placeholder="0"></label>
+      <label>1円 <input type="text" inputmode="numeric" autocomplete="off" data-denom="1" placeholder="0"></label>
+    </div>
+
+    <div class="cash-check-actions">
+      <button type="button" onclick="clearCashCheckInputs()">C</button>
+      <button type="button" onclick="closeCashCheckModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CASH_CHECK_STORAGE_KEY = "kakashi_cash_check_counts_v1";
+
+function yen(n) {
+  return `${Number(n || 0).toLocaleString()}円`;
+}
+
+function normalizeNumericText(value) {
+  const zenkaku = "０１２３４５６７８９，．＋－";
+  const hankaku = "0123456789,.+-";
+  let s = String(value || "").trim();
+  s = s.replace(/[０-９，．＋－]/g, ch => hankaku[zenkaku.indexOf(ch)] || ch);
+  return s.replace(/[,円￥¥\s]/g, "").replace(/^\+/, "");
+}
+
+function toNonNegativeInt(value) {
+  const s = normalizeNumericText(value);
+  if (!/^\d+$/.test(s)) return 0;
+  return Number(s);
+}
+
+function formatCashInput(input) {
+  const n = toNonNegativeInt(input.value);
+  input.value = n > 0 ? n.toLocaleString() : "";
+}
+
+function disableFormSubmitButtons(form, label) {
+  form.querySelectorAll('button[type="submit"]').forEach(btn => {
+    btn.disabled = true;
+    if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+    btn.textContent = label || "処理中...";
+  });
+}
+
+function setupSimpleSubmitGuard(formId, label) {
+  const form = document.getElementById(formId);
+  if (!form) return;
+  form.addEventListener("submit", () => disableFormSubmitButtons(form, label || "処理中..."));
+}
+
+function copyCashCheckToDailyClose() {
+  const input = document.getElementById("dailyCloseActualCash");
+  if (!input) return;
+  const actual = calcActualCash();
+  input.value = actual > 0 ? actual.toLocaleString() : "";
+}
+
+
+function expectedCashBalance() {
+  const el = document.getElementById("expectedCashBalance");
+  return Number(el?.dataset?.amount || 0);
+}
+
+function cashCheckInputs() {
+  return Array.from(document.querySelectorAll("#cashDenomGrid input[data-denom]"));
+}
+
+function loadCashCheckInputs() {
+  let data = {};
+  try {
+    data = JSON.parse(localStorage.getItem(CASH_CHECK_STORAGE_KEY) || "{}");
+  } catch (e) {
+    data = {};
+  }
+
+  cashCheckInputs().forEach(input => {
+    const denom = input.dataset.denom;
+    if (data[denom] !== undefined) {
+      input.value = data[denom];
+    }
+  });
+}
+
+function saveCashCheckInputs() {
+  const data = {};
+  cashCheckInputs().forEach(input => {
+    const denom = input.dataset.denom;
+    const count = toNonNegativeInt(input.value);
+    if (count > 0) {
+      data[denom] = String(count);
+    }
+  });
+  localStorage.setItem(CASH_CHECK_STORAGE_KEY, JSON.stringify(data));
+}
+
+function calcActualCash() {
+  return cashCheckInputs().reduce((sum, input) => {
+    const denom = Number(input.dataset.denom || 0);
+    const count = toNonNegativeInt(input.value);
+    return sum + denom * count;
+  }, 0);
+}
+
+function updateCashCheckResult() {
+  const expected = expectedCashBalance();
+  const actual = calcActualCash();
+  const diff = actual - expected;
+
+  document.getElementById("cashExpectedText").textContent = yen(expected);
+  document.getElementById("cashActualText").textContent = yen(actual);
+  const diffEl = document.getElementById("cashDiffText");
+  diffEl.textContent = `${diff >= 0 ? "+" : ""}${yen(diff)}`;
+  diffEl.classList.toggle("diff-plus", diff > 0);
+  diffEl.classList.toggle("diff-minus", diff < 0);
+}
+
+function openCashCheckModal() {
+  loadCashCheckInputs();
+  updateCashCheckResult();
+  document.getElementById("cashCheckModal").style.display = "flex";
+}
+
+function closeCashCheckModal() {
+  saveCashCheckInputs();
+  document.getElementById("cashCheckModal").style.display = "none";
+}
+
+function clearCashCheckInputs() {
+  cashCheckInputs().forEach(input => input.value = "");
+  localStorage.removeItem(CASH_CHECK_STORAGE_KEY);
+  updateCashCheckResult();
+}
+
+cashCheckInputs().forEach(input => {
+  input.addEventListener("input", () => {
+    const clean = normalizeNumericText(input.value);
+    if (input.value !== clean) input.value = clean;
+    saveCashCheckInputs();
+    updateCashCheckResult();
+  });
+  input.addEventListener("blur", () => formatCashInput(input));
+});
+
+const cashDrawerForm = document.getElementById("cashDrawerForm");
+if (cashDrawerForm) {
+  cashDrawerForm.addEventListener("submit", (e) => {
+    const amountInput = cashDrawerForm.querySelector('input[name="amount"]');
+    const amount = toNonNegativeInt(amountInput ? amountInput.value : "0");
+    if (amount <= 0) {
+      e.preventDefault();
+      alert("1円以上の金額を入力してください。金額上限はありません。");
+      return;
+    }
+    amountInput.value = String(amount);
+    disableFormSubmitButtons(cashDrawerForm, "記録中...");
+  });
+
+  const amountInput = cashDrawerForm.querySelector('input[name="amount"]');
+  if (amountInput) {
+    amountInput.addEventListener("input", () => {
+      const clean = normalizeNumericText(amountInput.value);
+      if (amountInput.value !== clean) amountInput.value = clean;
+    });
+    amountInput.addEventListener("blur", () => formatCashInput(amountInput));
+  }
+}
+
+setupSimpleSubmitGuard("openingCashForm", "登録中...");
+setupSimpleSubmitGuard("dailyCloseForm", "PDF作成中...");
+const refundForm = document.getElementById("refundForm");
+if (refundForm) refundForm.addEventListener("submit", () => disableFormSubmitButtons(refundForm, "返金処理中..."));
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadCashCheckInputs();
+  updateCashCheckResult();
+});
+</script>
+
+</body>
+</html>

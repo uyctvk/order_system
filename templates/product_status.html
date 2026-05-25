@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>商品状態管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="register-body">
+  <main class="register-main">
+    <section class="register-card wide-admin">
+      <h1>商品状態管理</h1>
+      <p class="small">売切れ・販売停止は product_menu.txt に即時反映されます。画面更新後のモバイルオーダーに反映されます。</p>
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="mobile-success">
+            {% for message in messages %}<div>{{ message }}</div>{% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <div class="admin-product-list">
+        {% for p in products %}
+          <div class="admin-product-row {% if p.inactive %}inactive-product{% endif %}">
+            <div>
+              <strong>[{{ p.category }}] {{ p.name }}</strong>
+              <div class="small">{{ "{:,}".format(p.base_price) }}円 / 行: {{ p.line_no }} / 状態: {% if p.inactive %}非表示{% else %}販売中{% endif %}</div>
+            </div>
+            <div class="admin-actions">
+              <form method="post" action="{{ url_for('product_status_toggle') }}">
+                <input type="hidden" name="line_no" value="{{ p.line_no }}">
+                <input type="hidden" name="action" value="soldout">
+                <button type="submit">売切れ</button>
+              </form>
+              <form method="post" action="{{ url_for('product_status_toggle') }}">
+                <input type="hidden" name="line_no" value="{{ p.line_no }}">
+                <input type="hidden" name="action" value="stop">
+                <button type="submit">販売停止</button>
+              </form>
+              <form method="post" action="{{ url_for('product_status_toggle') }}">
+                <input type="hidden" name="line_no" value="{{ p.line_no }}">
+                <input type="hidden" name="action" value="active">
+                <button type="submit">販売中に戻す</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    <footer class="staff-top-footer" style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;">
+      <a class="back-order" href="{{ url_for('staff_portal') }}">スタッフ用TOPページへ戻る</a>
+    </footer>
+
+  </section>
+</main>
+</body>
+</html>

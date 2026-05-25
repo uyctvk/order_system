@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>スタッフメニュー</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .staff-menu-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin-top:18px; }
+    .staff-menu-card { display:block; padding:18px; border-radius:16px; border:1px solid #d1d5db; background:#fff; text-decoration:none; color:inherit; box-shadow:0 6px 18px rgba(15,23,42,.08); }
+    .staff-menu-card h2 { margin:0 0 8px; font-size:1.1rem; }
+    .staff-menu-card p { margin:0; color:#4b5563; line-height:1.6; }
+    .staff-menu-card:hover { transform:translateY(-1px); box-shadow:0 10px 24px rgba(15,23,42,.12); }
+    .staff-menu-card.disabled { background:#f9fafb; color:#6b7280; }
+    .staff-login-panel,.staff-admin-panel { margin-top:18px; padding:16px; border-radius:16px; background:#f9fafb; border:1px solid #e5e7eb; }
+    .staff-login-panel form,.staff-admin-panel form { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+    .staff-login-panel input { min-width:220px; }
+    .staff-badge { display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px; font-size:.75rem; background:#fee2e2; color:#991b1b; vertical-align:middle; }
+    .staff-security-note { margin-top:12px; padding:12px; border-radius:12px; background:#fff7ed; color:#9a3412; line-height:1.7; }
+    .login-meta { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:center; }
+  </style>
+</head>
+<body>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="flash">{% for message in messages %}<div>{{ message }}</div>{% endfor %}</div>
+  {% endif %}
+{% endwith %}
+
+<main>
+  <section class="card register-card wide-admin">
+    <h1>スタッフメニュー</h1>
+
+    {% if not staff_authenticated %}
+      <p class="small">不正会計・不正再発行を防ぐため、店員IDとパスワードでログインしてください。</p>
+      <div class="staff-login-panel">
+        <strong>店員ログイン</strong>
+        <form method="post" action="{{ url_for('staff_login') }}" style="margin-top:10px;">
+          <label>ID<br><input name="username" autocomplete="username" required autofocus></label>
+          <label>パスワード<br><input type="password" name="password" autocomplete="current-password" required></label>
+          <button type="submit">ログイン</button>
+        </form>
+        <p class="small">初回起動時は管理者IDが自動作成されます。config.txt の INITIAL_ADMIN_ID / INITIAL_ADMIN_PASSWORD で初期値を指定できます。</p>
+      </div>
+      <div class="staff-security-note">
+        この画面から先の「注文キャンセル」「かかし入店システム」「試験用メニュー表」「レジ画面」「売上確認」は、店員ログイン後のみ使用できます。
+      </div>
+    {% else %}
+      <div class="login-meta">
+        <p class="small">
+          ログイン中：<strong>{{ user.display_name or user.username }}</strong>
+          / ID：{{ user.username }}
+          / 権限：{{ role_label(user.role) }}
+        </p>
+        <form method="post" action="{{ url_for('staff_logout') }}">
+          <button type="submit">ログアウト</button>
+        </form>
+      </div>
+
+      <p class="small">現場で使う画面をここに集約しています。入店処理・QR再発行・キッチン指示伝票再発行は「かかし入店システム」から行います。</p>
+
+      <div class="staff-menu-grid">
+        <a class="staff-menu-card" href="{{ url_for('staff_order_cancel_page') }}">
+          <h2>注文キャンセル</h2>
+          <p>会計前の注文を商品単位・数量単位でキャンセルします。</p>
+        </a>
+
+        {% if admin_authenticated %}
+          <a class="staff-menu-card" href="{{ url_for('product_status_page') }}">
+            <h2>商品売切れ・販売停止 <span class="staff-badge">管理者</span></h2>
+            <p>商品マスタの販売中・売切れ・販売停止を切り替えます。</p>
+          </a>
+        {% else %}
+          <div class="staff-menu-card disabled">
+            <h2>商品売切れ・販売停止 <span class="staff-badge">管理者</span></h2>
+            <p>管理者権限のユーザーのみ使用できます。</p>
+          </div>
+        {% endif %}
+
+        <a class="staff-menu-card" href="{{ url_for('entry') }}">
+          <h2>かかし入店システム</h2>
+          <p>入店処理、QR再発行、キッチン指示伝票の再発行を行います。</p>
+        </a>
+
+        <a class="staff-menu-card" href="{{ url_for('staff_test_menu') }}">
+          <h2>試験用メニュー表</h2>
+          <p>QRコードを読み取らずに、テーブル999固定でモバイル注文画面を確認します。</p>
+        </a>
+
+        <a class="staff-menu-card" href="{{ url_for('register') }}">
+          <h2>レジ画面</h2>
+          <p>通常会計・個別会計・合算会計を行います。</p>
+        </a>
+
+        <a class="staff-menu-card" href="{{ url_for('admin_sales') }}">
+          <h2>売上確認</h2>
+          <p>売上、支払方法別集計、CSV・Excel出力を確認します。</p>
+        </a>
+
+        {% if admin_authenticated %}
+          <a class="staff-menu-card" href="{{ url_for('admin_users_page') }}">
+            <h2>ユーザー管理 <span class="staff-badge">管理者</span></h2>
+            <p>店員・管理者の登録、退会、ID/PW設定、権限変更を行います。</p>
+          </a>
+        {% else %}
+          <div class="staff-menu-card disabled">
+            <h2>ユーザー管理 <span class="staff-badge">管理者</span></h2>
+            <p>管理者権限のユーザーのみ使用できます。</p>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>伝票プレビュー {{ receipt.receipt_no }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="preview-body">
+  <main class="preview-main">
+    <section class="hagaki-preview">
+      <h1>{{ store_name }}</h1>
+      <p class="thanks">ご利用ありがとうございます</p>
+
+      <div class="ticket-line">
+        <span>レシート番号</span>
+        <strong>{{ receipt.receipt_no }}</strong>
+      </div>
+      <div class="ticket-line">
+        <span>テーブル番号</span>
+        <strong>{{ receipt.table_no }}</strong>
+      </div>
+
+      <img class="preview-qr" src="{{ url_for('static', filename=receipt.qr_path) }}" alt="QRコード">
+      <p class="order-guide">QRコードを読み取って注文してください。</p>
+      <p class="issued-at">発行日時: {{ receipt.created_at }}</p>
+    </section>
+
+    <section class="preview-note">
+      <p>PDFはアプリ内の <strong>receipts/{{ pdf_name }}</strong> に自動保存済みです。</p>
+      <p>この画面は、ブラウザのPDF保存ダイアログを出さないための代替プレビューです。</p>
+      <a class="manual-pdf-link" href="{{ url_for('receipt_pdf', receipt_no=receipt.receipt_no) }}" target="_blank">PDFを開く</a>
+    </section>
+    <footer class="staff-top-footer" style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;">
+      <a class="back-order" href="{{ url_for('staff_portal') }}">スタッフ用TOPページへ戻る</a>
+    </footer>
+
+  </main>
+</body>
+</html>

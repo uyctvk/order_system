@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>モバイルオーダー</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <style>
+    :root {
+      --menu-photo-w: {{ menu_display.photo_width }}px;
+      --menu-photo-h: {{ menu_display.photo_height }}px;
+      --popup-photo-h: {{ menu_display.popup_photo_height }}px;
+      --text-scale: {{ menu_display.text_scale_ratio }};
+      --photo-fit: {{ menu_display.photo_object_fit }};
+    }
+    .staff-test-banner.compact-test-header {
+      margin: 0 0 10px !important;
+      padding: 10px 12px !important;
+      border-radius: 14px !important;
+      background: #f9fafb !important;
+      border: 1px solid #e5e7eb !important;
+    }
+    .test-title-line {
+      display: flex !important;
+      align-items: baseline !important;
+      justify-content: space-between !important;
+      gap: 10px !important;
+      flex-wrap: wrap !important;
+    }
+    .test-title-line h1 {
+      margin: 0 !important;
+      font-size: calc(1.18rem * var(--text-scale)) !important;
+      line-height: 1.25 !important;
+    }
+    .test-receipt-line {
+      color: #374151 !important;
+      font-size: calc(.88rem * var(--text-scale)) !important;
+      font-weight: 800 !important;
+      white-space: nowrap !important;
+    }
+    .test-note-line {
+      margin: 4px 0 0 !important;
+      color: #6b7280 !important;
+      font-size: calc(.78rem * var(--text-scale)) !important;
+      line-height: 1.45 !important;
+    }
+    .language-panel {
+      margin: 8px 0 10px;
+      padding: 8px 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fff;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-start;
+      flex-wrap: nowrap;
+    }
+    .language-panel label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      color: #374151;
+      white-space: nowrap;
+      width: auto;
+    }
+    .language-panel select {
+      width: auto;
+      min-width: 132px;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      background: #fff;
+      font-size: calc(.95rem * var(--text-scale));
+    }
+    .language-note { display: none !important; }
+    .genre-bar {
+      display: flex !important;
+      gap: 8px !important;
+      overflow-x: auto !important;
+      overflow-y: hidden !important;
+      white-space: nowrap !important;
+      -webkit-overflow-scrolling: touch !important;
+      padding: 4px 0 10px !important;
+      margin: 4px 0 10px !important;
+      scrollbar-width: auto !important;
+    }
+    .genre-bar a {
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      min-height: 36px !important;
+      padding: 8px 12px !important;
+      border-radius: 999px !important;
+      white-space: nowrap !important;
+      box-sizing: border-box !important;
+      font-size: calc(.9rem * var(--text-scale)) !important;
+    }
+    .product-row.menu-card {
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) 104px !important;
+      grid-template-areas:
+        "photo photo"
+        "name name"
+        "price action" !important;
+      gap: 0 10px !important;
+      align-items: stretch !important;
+      box-sizing: border-box !important;
+      padding: 10px !important;
+      border-radius: 16px !important;
+      overflow: hidden !important;
+    }
+    .product-row.menu-card:not(.has-image) {
+      grid-template-areas:
+        "name name"
+        "price action" !important;
+    }
+    .menu-image-wrap {
+      grid-area: photo !important;
+      width: 100% !important;
+      height: var(--menu-photo-h) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      overflow: hidden !important;
+      border-radius: 14px !important;
+      background: #f3f4f6 !important;
+      border: 1px solid #e5e7eb !important;
+      box-sizing: border-box !important;
+      margin-bottom: 9px !important;
+      position: relative !important;
+    }
+    .menu-image-wrap::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -10px;
+      height: 1px;
+      background: #e5e7eb;
+    }
+    .menu-image {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: var(--photo-fit) !important;
+      display: block !important;
+      background: #fff !important;
+    }
+    .menu-card-main { display: contents !important; }
+    .product-name {
+      grid-area: name !important;
+      font-size: calc(1.02rem * var(--text-scale)) !important;
+      line-height: 1.35 !important;
+      overflow-wrap: anywhere !important;
+      font-weight: 850 !important;
+      padding: 4px 0 6px !important;
+      min-width: 0 !important;
+      border-bottom: 1px solid #eef2f7 !important;
+    }
+    .product-price {
+      grid-area: price !important;
+      min-width: 0 !important;
+      align-self: center !important;
+      line-height: 1.35 !important;
+      overflow-wrap: anywhere !important;
+      font-size: calc(.95rem * var(--text-scale)) !important;
+      padding: 8px 0 0 !important;
+    }
+    .option-required {
+      display: inline-block !important;
+      margin-top: 3px !important;
+      white-space: nowrap !important;
+      font-size: calc(.74rem * var(--text-scale)) !important;
+    }
+    .add-cart-btn {
+      grid-area: action !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: none !important;
+      height: 42px !important;
+      min-height: 42px !important;
+      padding: 0 10px !important;
+      box-sizing: border-box !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      justify-self: stretch !important;
+      align-self: end !important;
+      flex: none !important;
+      white-space: nowrap !important;
+      line-height: 1 !important;
+      border-radius: 12px !important;
+      font-size: calc(.92rem * var(--text-scale)) !important;
+      margin-top: 8px !important;
+    }
+    @media (max-width: 560px) {
+      .mobile-card { padding-left: 12px !important; padding-right: 12px !important; }
+      .product-row.menu-card { grid-template-columns: minmax(0, 1fr) 92px !important; padding: 9px !important; gap: 0 8px !important; }
+      .menu-image-wrap { height: min(var(--menu-photo-h), 210px) !important; }
+      .add-cart-btn { height: 40px !important; min-height: 40px !important; padding: 0 8px !important; }
+      .test-receipt-line { white-space: normal !important; }
+    }
+    @media (max-width: 380px) {
+      .product-row.menu-card { grid-template-columns: minmax(0, 1fr) 86px !important; }
+      .language-panel select { min-width: 118px; }
+    }
+    .category-title, .mobile-sub, .small, .guest-info-summary, .history-row, .history-total, .cart-row, .mobile-total-line {
+      font-size: calc(1em * var(--text-scale));
+    }
+    .cart-row button {
+      width: 76px !important;
+      min-width: 76px !important;
+      height: 38px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-sizing: border-box !important;
+      white-space: nowrap !important;
+      flex: 0 0 76px !important;
+      font-size: calc(.9rem * var(--text-scale)) !important;
+    }
+    .mobile-popup-card {
+      width: min(92vw, 520px) !important;
+      max-height: 86vh !important;
+      overflow-y: auto !important;
+      box-sizing: border-box !important;
+      padding: 18px !important;
+      font-size: calc(1rem * var(--text-scale)) !important;
+    }
+    #popupProductImage {
+      width: 100% !important;
+      min-height: 0 !important;
+      margin: 8px 0 10px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border-radius: 14px !important;
+      background: #f9fafb !important;
+      overflow: hidden !important;
+      border: 1px solid #e5e7eb !important;
+      box-sizing: border-box !important;
+    }
+    .popup-product-image {
+      width: 100% !important;
+      max-width: 100% !important;
+      height: min(30vh, var(--popup-photo-h)) !important;
+      max-height: var(--popup-photo-h) !important;
+      object-fit: contain !important;
+      display: block !important;
+      border-radius: 12px !important;
+      background: #fff !important;
+    }
+    .mobile-popup-card h2 { margin: 0 0 6px !important; line-height: 1.35 !important; font-size: calc(1.25rem * var(--text-scale)) !important; }
+    .option-group { margin-top: 10px !important; }
+    .option-group h3 { margin: 8px 0 6px !important; font-size: calc(1rem * var(--text-scale)) !important; }
+    .option-choice { min-height: 40px !important; padding: 9px 10px !important; box-sizing: border-box !important; font-size: calc(.95rem * var(--text-scale)) !important; }
+    .mobile-popup-card .submit-order, .mobile-popup-card .back-order {
+      width: 100% !important;
+      min-height: 46px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-sizing: border-box !important;
+      font-size: calc(.95rem * var(--text-scale)) !important;
+    }
+  </style>
+
+</head>
+<body class="mobile-body" data-default-language="{{ menu_display.default_language }}" data-language-select-enabled="{{ 1 if menu_display.enable_language_select else 0 }}">
+  <main class="mobile-main">
+    <section class="mobile-card">
+
+      <div class="staff-test-banner compact-test-header customer-order-header">
+        <div class="test-title-line">
+          <h1>{{ store_name }}</h1>
+          <div class="test-receipt-line"><span data-i18n="table">テーブル</span>{{ receipt.table_no }} / <span data-i18n="receipt">レシート番号</span> {{ receipt.receipt_no }}</div>
+        </div>
+      </div>
+
+      {% if receipt.guest_info_submitted %}
+        <div class="guest-info-summary">
+          <span data-i18n="adult">大人</span> {{ receipt.adult_count }}名 / <span data-i18n="child">子供</span> {{ receipt.child_count }}名
+          {% if receipt.child_chopsticks or receipt.spoon_fork %}
+            <br><span data-i18n="childChopsticks">子供用箸</span> {{ receipt.child_chopsticks }}個 / <span data-i18n="spoonFork">スプーン・フォーク</span> {{ receipt.spoon_fork }}個
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="mobile-success">
+            {% for message in messages %}<div>{{ message }}</div>{% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <div class="language-panel" id="languagePanel">
+        <label><span data-i18n="language">言語</span>
+          <select id="languageSelect">
+            <option value="ja">日本語</option>
+            <option value="zh">中文</option>
+            <option value="ko">한국어</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="genre-bar">
+        {% for category in categories %}
+          <a href="#genre-{{ loop.index }}" data-i18n-json='{{ category.i18n|tojson }}'>{{ category.name }}</a>
+        {% endfor %}
+      </div>
+
+      <form method="post" action="{{ url_for('mobile_order', token=receipt.token) }}" id="orderForm">
+        <input type="hidden" name="cart_json" id="cartJson" value="[]">
+
+        {% set ns = namespace(current='', index=0) %}
+        {% for p in products %}
+          {% if ns.current != p.category %}
+            {% set ns.current = p.category %}
+            {% set ns.index = ns.index + 1 %}
+            <h2 class="category-title" id="genre-{{ ns.index }}" data-i18n-json='{{ p.category_i18n|tojson }}'>{{ p.category }}</h2>
+          {% endif %}
+
+          <div class="product-row menu-product menu-card{% if p.image_path %} has-image{% endif %}" data-product='{{ p|tojson }}'>
+            {% if p.image_path %}
+              <div class="menu-image-wrap">
+                <img class="menu-image" src="{{ url_for('static', filename=p.image_path.replace('static/', '', 1)) if p.image_path.startswith('static/') else p.image_path }}" data-i18n-alt='{{ p.name_i18n|tojson }}' alt="{{ p.name }}">
+              </div>
+            {% endif %}
+            <div class="menu-card-main">
+              <div class="product-name" data-i18n-json='{{ p.name_i18n|tojson }}'>{{ p.name }}</div>
+              <div class="product-price">
+                <span class="money" data-amount="{{ p.base_price }}">{{ "{:,}".format(p.base_price) }}円</span>
+                {% if p.option_groups %}<span class="option-required" data-i18n="optionRequired">セット選択必須</span>{% endif %}
+              </div>
+            </div>
+            <button class="add-cart-btn" type="button" onclick="openProductPopup(this)" data-i18n="add">追加</button>
+          </div>
+        {% endfor %}
+
+        <h2 class="category-title" data-i18n="cart">カート</h2>
+        <div id="cartArea" class="cart-area"><p class="small" data-i18n="emptyCart">まだ商品がありません。</p></div>
+
+        <div class="mobile-footer">
+          <div class="mobile-total-line"><span data-i18n="totalPrefix">合計：</span><span id="cartTotal">0円</span></div>
+          <button class="submit-order" type="submit" data-i18n="order">注文する</button>
+        </div>
+      </form>
+
+      <h2 class="category-title" data-i18n="history">注文履歴</h2>
+      <div class="order-history-area">
+        {% if items %}
+          {% for item in items %}
+            <div class="history-row">
+              <div>
+                <strong data-i18n-json='{{ order_name_i18n(item.product_name)|tojson }}'>{{ item.product_name }}</strong>
+                <div class="small"><span class="money" data-amount="{{ item.unit_price }}">{{ "{:,}".format(item.unit_price) }}円</span> × {{ item.quantity }}</div>
+              </div>
+              <strong class="money" data-amount="{{ item.line_total }}">{{ "{:,}".format(item.line_total) }}円</strong>
+            </div>
+          {% endfor %}
+          <div class="history-total"><span data-i18n="submittedTotal">注文済み合計：</span><span class="money" data-amount="{{ subtotal }}">{{ "{:,}".format(subtotal) }}円</span></div>
+        {% else %}
+          <p class="small" data-i18n="emptyHistory">まだ注文履歴はありません。</p>
+        {% endif %}
+      </div>
+    </section>
+
+
+  </main>
+
+<div class="mobile-popup-back" id="productPopup">
+  <div class="mobile-popup-card">
+    <h2 id="popupProductName"></h2>
+    <div id="popupProductImage"></div>
+    <p id="popupProductPrice" class="small"></p>
+    <div id="popupOptionsArea"></div>
+    <label class="popup-label" data-i18n="qty">数量</label>
+    <div class="qty-control popup-qty">
+      <button type="button" onclick="changePopupQty(-1)">−</button>
+      <input id="popupQuantity" value="1" readonly>
+      <button type="button" onclick="changePopupQty(1)">＋</button>
+    </div>
+    <button class="submit-order" type="button" onclick="addCurrentProductToCart()" data-i18n="addToCart">カートに追加</button>
+    <button class="back-order sub-button" type="button" onclick="closeProductPopup()" data-i18n="cancel">キャンセル</button>
+  </div>
+</div>
+
+<script>
+let cart = [];
+let currentProduct = null;
+let popupQty = 1;
+const PAGE_CONFIG = document.body.dataset;
+let currentLang = PAGE_CONFIG.defaultLanguage || "ja";
+const LANGUAGE_SELECT_ENABLED = PAGE_CONFIG.languageSelectEnabled === "1";
+
+const I18N = {
+  ja: {
+    language: "言語", languageNote: "商品名・カテゴリ・選択肢も選択した言語に自動翻訳します。写真サイズと文字サイズは menu_display.txt の固定値です。",
+    testTitle: "試験用メニュー表", testSubtitle: "写真上部型", testNote: "QRコードを使わずに表示しているスタッフ確認用画面です。通常のお客様用HTMLとは別ファイルです。",
+    table: "テーブル", receipt: "レシート番号", fixed: "固定", adult: "大人", child: "子供", childChopsticks: "子供用箸", spoonFork: "スプーン・フォーク",
+    optionRequired: "セット選択必須", add: "追加", cart: "カート", emptyCart: "まだ商品がありません。", totalPrefix: "合計：", order: "注文する", history: "注文履歴", emptyHistory: "まだ注文履歴はありません。", submittedTotal: "注文済み合計：",
+    basePrice: "基本価格：", optionGroup: "追加選択", qty: "数量", addToCart: "カートに追加", cancel: "キャンセル", remove: "削除", staffTop: "スタッフ用TOPページへ戻る",
+    selectAllOptionsAlert: "セットメニューの追加項目をすべて選択してください。", addOneItemAlert: "商品を1つ以上カートに追加してください。", sending: "送信中..."
+  },
+  zh: {
+    language: "语言", languageNote: "商品名称、分类和选项也会自动翻译。图片和文字大小由 menu_display.txt 固定。",
+    testTitle: "测试菜单", testSubtitle: "A方案｜双行卡片", testNote: "这是无需扫描二维码的员工确认画面。与正式顾客用HTML分离。",
+    table: "桌号", receipt: "小票编号", fixed: "固定", adult: "成人", child: "儿童", childChopsticks: "儿童筷子", spoonFork: "勺叉",
+    optionRequired: "必须选择套餐选项", add: "添加", cart: "购物车", emptyCart: "还没有商品。", totalPrefix: "合计：", order: "下单", history: "订单记录", emptyHistory: "还没有订单记录。", submittedTotal: "已下单合计：",
+    basePrice: "基础价格：", optionGroup: "附加选择", qty: "数量", addToCart: "加入购物车", cancel: "取消", remove: "删除", staffTop: "返回员工首页",
+    selectAllOptionsAlert: "请完成套餐的所有必选项目。", addOneItemAlert: "请至少添加一件商品。", sending: "提交中..."
+  },
+  ko: {
+    language: "언어", languageNote: "상품명, 카테고리, 선택지도 선택한 언어로 자동 번역됩니다. 사진과 글자 크기는 menu_display.txt의 고정값을 사용합니다.",
+    testTitle: "시험용 메뉴판", testSubtitle: "A안｜2단 카드형", testNote: "QR코드 없이 표시하는 직원 확인용 화면입니다. 실제 고객용 HTML과 분리되어 있습니다.",
+    table: "테이블", receipt: "영수증 번호", fixed: "고정", adult: "성인", child: "어린이", childChopsticks: "어린이용 젓가락", spoonFork: "스푼·포크",
+    optionRequired: "세트 선택 필수", add: "추가", cart: "장바구니", emptyCart: "아직 상품이 없습니다.", totalPrefix: "합계：", order: "주문하기", history: "주문 내역", emptyHistory: "아직 주문 내역이 없습니다.", submittedTotal: "주문 완료 합계：",
+    basePrice: "기본 가격：", optionGroup: "추가 선택", qty: "수량", addToCart: "장바구니에 추가", cancel: "취소", remove: "삭제", staffTop: "직원 TOP으로 돌아가기",
+    selectAllOptionsAlert: "세트 메뉴의 필수 선택 항목을 모두 선택해 주세요.", addOneItemAlert: "상품을 1개 이상 장바구니에 추가해 주세요.", sending: "전송 중..."
+  },
+  en: {
+    language: "Language", languageNote: "Item names, categories, and options are automatically translated. Photo and text sizes are fixed in menu_display.txt.",
+    testTitle: "Test menu", testSubtitle: "Option A | Two-row card", testNote: "Staff-only test screen without QR scanning. This is separated from the real customer HTML.",
+    table: "Table", receipt: "Receipt No.", fixed: "fixed", adult: "Adults", child: "Children", childChopsticks: "Child chopsticks", spoonFork: "Spoon/Fork",
+    optionRequired: "Required set option", add: "Add", cart: "Cart", emptyCart: "No items yet.", totalPrefix: "Total: ", order: "Place order", history: "Order history", emptyHistory: "No order history yet.", submittedTotal: "Submitted total: ",
+    basePrice: "Base price: ", optionGroup: "Option", qty: "Quantity", addToCart: "Add to cart", cancel: "Cancel", remove: "Remove", staffTop: "Back to staff top",
+    selectAllOptionsAlert: "Please select all required set options.", addOneItemAlert: "Please add at least one item to the cart.", sending: "Sending..."
+  }
+};
+const LANG_TO_HTML = { ja: "ja", zh: "zh-CN", ko: "ko", en: "en" };
+const LANGUAGE_KEY = "kakashi_menu_language_v3";
+const LANGS = ["ja", "zh", "ko", "en"];
+
+function t(key) { return (I18N[currentLang] && I18N[currentLang][key]) || I18N.ja[key] || key; }
+function localized(obj, lang = currentLang) {
+  if (!obj) return "";
+  if (typeof obj === "string") return obj;
+  return obj[lang] || obj.ja || obj.en || Object.values(obj)[0] || "";
+}
+function parseI18nJson(text) { try { return JSON.parse(text || "{}"); } catch(e) { return {}; } }
+function formatMoney(n) {
+  const value = Number(n || 0).toLocaleString();
+  if (currentLang === "ja") return `${value}円`;
+  if (currentLang === "zh") return `${value}日元`;
+  if (currentLang === "ko") return `${value}엔`;
+  return `¥${value}`;
+}
+function yen(n) { return formatMoney(n); }
+
+function productImageSrc(path) {
+  if (!path) return "";
+  if (path.startsWith("static/")) return "/" + path;
+  return path;
+}
+
+function translateStaticText() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.dataset.i18n;
+    if (I18N[currentLang] && I18N[currentLang][key]) el.textContent = t(key);
+  });
+}
+function translateDynamicText() {
+  document.querySelectorAll("[data-i18n-json]").forEach(el => {
+    const data = parseI18nJson(el.dataset.i18nJson);
+    const value = localized(data);
+    if (value) el.textContent = value;
+  });
+  document.querySelectorAll("img[data-i18n-alt]").forEach(img => {
+    const data = parseI18nJson(img.dataset.i18nAlt);
+    const value = localized(data);
+    if (value) img.alt = value;
+  });
+}
+function renderMoneyFields() { document.querySelectorAll(".money[data-amount]").forEach(el => { el.textContent = formatMoney(el.dataset.amount); }); }
+function setLanguage(lang, persist = true) {
+  currentLang = ["ja", "zh", "ko", "en"].includes(lang) ? lang : "ja";
+  document.documentElement.lang = LANG_TO_HTML[currentLang] || "ja";
+  const select = document.getElementById("languageSelect");
+  if (select) select.value = currentLang;
+  translateStaticText();
+  translateDynamicText();
+  renderMoneyFields();
+  updateCart();
+  if (currentProduct) renderPopupContents();
+  if (persist) localStorage.setItem(LANGUAGE_KEY, currentLang);
+}
+
+function setupLanguage() {
+  const saved = localStorage.getItem(LANGUAGE_KEY);
+  const initial = LANGUAGE_SELECT_ENABLED && saved ? saved : currentLang;
+  const select = document.getElementById("languageSelect");
+  if (select) {
+    select.value = initial;
+    select.addEventListener("change", () => setLanguage(select.value, true));
+  }
+  if (!LANGUAGE_SELECT_ENABLED) {
+    const panel = document.getElementById("languagePanel");
+    if (panel) panel.style.display = "none";
+  }
+  setLanguage(initial, false);
+}
+
+function renderPopupContents() {
+  if (!currentProduct) return;
+  document.getElementById("popupProductName").textContent = localized(currentProduct.name_i18n) || currentProduct.name;
+  const imageBox = document.getElementById("popupProductImage");
+  if (currentProduct.image_path) {
+    const alt = localized(currentProduct.name_i18n) || currentProduct.name;
+    imageBox.innerHTML = `<img class="popup-product-image" src="${productImageSrc(currentProduct.image_path)}" alt="${alt}">`;
+  } else {
+    imageBox.innerHTML = "";
+  }
+  document.getElementById("popupProductPrice").textContent = `${t("basePrice")}${yen(currentProduct.base_price)}`;
+  const area = document.getElementById("popupOptionsArea");
+  area.innerHTML = "";
+  currentProduct.option_groups.forEach((group, groupIndex) => {
+    const block = document.createElement("div");
+    block.className = "option-group";
+    const title = document.createElement("h3");
+    title.textContent = `${t("optionGroup")} ${groupIndex + 1}`;
+    block.appendChild(title);
+    group.options.forEach((option, optionIndex) => {
+      const label = document.createElement("label");
+      label.className = "option-choice";
+      label.innerHTML = `
+        <input type="radio" name="group_${groupIndex}" value="${optionIndex}">
+        <span>${localized(option.name_i18n) || option.name}</span>
+        <strong>${option.price_delta >= 0 ? "+" : ""}${yen(option.price_delta)}</strong>
+      `;
+      block.appendChild(label);
+    });
+    area.appendChild(block);
+  });
+}
+
+function openProductPopup(button) {
+  currentProduct = JSON.parse(button.closest(".menu-product").dataset.product);
+  popupQty = 1;
+  document.getElementById("popupQuantity").value = popupQty;
+  renderPopupContents();
+  document.getElementById("productPopup").style.display = "flex";
+}
+function closeProductPopup() { document.getElementById("productPopup").style.display = "none"; currentProduct = null; }
+function changePopupQty(diff) { popupQty = Math.max(1, Math.min(20, popupQty + diff)); document.getElementById("popupQuantity").value = popupQty; }
+
+function makeCartNameI18n(product, selectedOptions) {
+  const result = {};
+  LANGS.forEach(lang => {
+    const parts = [localized(product.name_i18n, lang) || product.name];
+    product.option_groups.forEach((group, idx) => {
+      const opt = group.options[selectedOptions[idx]];
+      parts.push(localized(opt.name_i18n, lang) || opt.name);
+    });
+    result[lang] = parts.join(" / ");
+  });
+  return result;
+}
+
+function addCurrentProductToCart() {
+  if (!currentProduct) return;
+  const selectedOptions = [];
+  for (let i = 0; i < currentProduct.option_groups.length; i++) {
+    const checked = document.querySelector(`input[name="group_${i}"]:checked`);
+    if (!checked) { alert(t("selectAllOptionsAlert")); return; }
+    selectedOptions.push(Number(checked.value));
+  }
+  let unitPrice = Number(currentProduct.base_price || 0);
+  currentProduct.option_groups.forEach((group, idx) => {
+    const option = group.options[selectedOptions[idx]];
+    unitPrice += Number(option.price_delta || 0);
+  });
+  const productNameI18n = makeCartNameI18n(currentProduct, selectedOptions);
+  cart.push({
+    product_id: currentProduct.id,
+    product_name: productNameI18n.ja,
+    product_name_i18n: productNameI18n,
+    quantity: popupQty,
+    unit_price: unitPrice,
+    line_total: unitPrice * popupQty,
+    selected_options: selectedOptions
+  });
+  updateCart();
+  closeProductPopup();
+}
+function removeCartItem(index) { cart.splice(index, 1); updateCart(); }
+function updateCart() {
+  const area = document.getElementById("cartArea");
+  const hidden = document.getElementById("cartJson");
+  const totalEl = document.getElementById("cartTotal");
+  if (!area || !hidden || !totalEl) return;
+  hidden.value = JSON.stringify(cart);
+  const total = cart.reduce((sum, item) => sum + Number(item.line_total || 0), 0);
+  totalEl.textContent = yen(total);
+  if (!cart.length) { area.innerHTML = `<p class="small" data-i18n="emptyCart">${t("emptyCart")}</p>`; return; }
+  area.innerHTML = "";
+  cart.forEach((item, index) => {
+    const row = document.createElement("div");
+    row.className = "cart-row";
+    row.innerHTML = `
+      <div>
+        <strong>${localized(item.product_name_i18n) || item.product_name}</strong>
+        <div class="small">${yen(item.unit_price)} × ${item.quantity}</div>
+      </div>
+      <div>
+        <strong>${yen(item.line_total)}</strong>
+        <button type="button" onclick="removeCartItem(${index})">${t("remove")}</button>
+      </div>
+    `;
+    area.appendChild(row);
+  });
+}
+
+let orderSubmitting = false;
+
+document.addEventListener("DOMContentLoaded", () => {
+  setupLanguage();
+  document.getElementById("orderForm")?.addEventListener("submit", (e) => {
+    if (!cart.length) {
+      e.preventDefault();
+      alert(t("addOneItemAlert"));
+      return;
+    }
+    if (orderSubmitting) {
+      e.preventDefault();
+      return;
+    }
+    orderSubmitting = true;
+    const submitButton = e.currentTarget.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.dataset.originalText = submitButton.textContent;
+      submitButton.textContent = t("sending");
+    }
+    document.querySelectorAll(".add-cart-btn, .cart-row button").forEach(btn => { btn.disabled = true; });
+  });
+});
+</script>
+
+</body>
+</html>

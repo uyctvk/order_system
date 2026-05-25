@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>管理者売上画面</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .admin-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid #e5e7eb; }
+    .admin-section h2 { margin-top: 0; }
+    .admin-toolbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end; }
+    .admin-toolbar label { font-weight: 700; }
+    .admin-toolbar input { width: 100%; box-sizing: border-box; }
+    .admin-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .empty-row { color: #6b7280; text-align: center; }
+    .export-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .export-grid .link-button { text-align: center; }
+    .staff-top-footer { margin-top: 30px; padding-top: 18px; border-top: 1px solid #e5e7eb; text-align: center; }
+  </style>
+</head>
+<body>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="flash">
+      {% for message in messages %}<div>{{ message }}</div>{% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<main>
+  <section class="card register-card wide-admin">
+    <h1>管理者売上画面</h1>
+    <p class="small">売上確認・CSV/Excel出力専用画面です。レジ金操作・返金処理はレジその他画面で行います。</p>
+
+    <section class="admin-section">
+      <h2>表示期間</h2>
+      <form method="get" action="{{ url_for('admin_sales') }}" class="register-subpanel admin-toolbar">
+        <label>開始日<br><input type="date" name="date_from" value="{{ date_from }}"></label>
+        <label>終了日<br><input type="date" name="date_to" value="{{ date_to }}"></label>
+        <button type="submit">表示更新</button>
+      </form>
+    </section>
+
+    <section class="admin-section">
+      <h2>売上サマリー</h2>
+      <div class="admin-summary-grid">
+        <div class="payment-summary-box">
+          <div class="small">売上件数</div>
+          <strong>{{ summary.count }}件</strong>
+        </div>
+        <div class="payment-summary-box">
+          <div class="small">売上金額</div>
+          <strong>{{ "{:,}".format(summary.total) }}円</strong>
+        </div>
+        <div class="payment-summary-box">
+          <div class="small">返金件数</div>
+          <strong>{{ summary.refund_count }}件</strong>
+        </div>
+        <div class="payment-summary-box">
+          <div class="small">返金金額</div>
+          <strong>{{ "{:,}".format(summary.refund_total) }}円</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="admin-section">
+      <h2>支払方法別確認</h2>
+      <table class="summary-table">
+        <thead>
+          <tr><th>支払方法</th><th>回数</th><th>金額</th></tr>
+        </thead>
+        <tbody>
+          {% for p in summary.payments %}
+            <tr>
+              <td>{{ p.payment_method }}</td>
+              <td>{{ p.count }}</td>
+              <td>{{ "{:,}".format(p.amount) }}円</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="empty-row">該当期間の支払データはありません。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="admin-section">
+      <h2>クーポン・割引確認</h2>
+      <table class="summary-table">
+        <thead>
+          <tr><th>項目</th><th>回数</th><th>金額</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>クーポン</td>
+            <td>{{ summary.coupon_count }}</td>
+            <td>{{ "{:,}".format(summary.coupon_amount) }}円</td>
+          </tr>
+          {% for d in summary.discounts %}
+            <tr>
+              <td>割引 {{ d.rate }}%</td>
+              <td>{{ d.count }}</td>
+              <td>{{ "{:,}".format(d.amount) }}円</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="admin-section">
+      <h2>CSV・Excel出力</h2>
+      <div class="export-grid">
+        <a class="pay-btn link-button" href="{{ url_for('sales_export_csv', date_from=date_from, date_to=date_to) }}">売上集計CSV出力</a>
+        <a class="pay-btn link-button" href="{{ url_for('checkout_receipts_export_csv', date_from=date_from, date_to=date_to) }}">過去会計伝票CSV出力</a>
+        <a class="pay-btn link-button" href="{{ url_for('hourly_genre_excel', date_from=date_from, date_to=date_to) }}">時間帯×商品ジャンル売上Excel出力</a>
+      </div>
+    </section>
+
+    <footer class="staff-top-footer">
+      <a class="back-order" href="{{ url_for('staff_portal') }}">スタッフ用TOPページへ戻る</a>
+    </footer>
+  </section>
+</main>
+</body>
+</html>
